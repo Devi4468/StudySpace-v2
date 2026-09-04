@@ -1,7 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
-dotenv.config();
+
 const connectDB = require("./config/db");
 
 const resourceRoutes = require("./routes/resourceRoutes");
@@ -14,15 +14,41 @@ const groupReplyRoutes = require("./routes/groupReplyRoutes");
 const groupQuestionRoutes = require("./routes/groupQuestionRoutes");
 const groupResourceRoutes = require("./routes/groupResourceRoutes");
 
+dotenv.config();
 
 const app = express();
 
 const PORT = process.env.PORT || 5000;
 
-connectDB();
+// ======================================================
+// CORS
+// ======================================================
 
-app.use(cors());
+app.use(
+  cors({
+    origin: [
+      "http://localhost:5173",
+    ],
+    methods: [
+      "GET",
+      "POST",
+      "PUT",
+      "DELETE",
+      "PATCH",
+      "OPTIONS",
+    ],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+    ],
+  })
+);
+
 app.use(express.json());
+
+// ======================================================
+// Health Check
+// ======================================================
 
 app.get("/", (req, res) => {
   res.json({
@@ -30,27 +56,46 @@ app.get("/", (req, res) => {
   });
 });
 
+// ======================================================
+// API Routes
+// ======================================================
+
 app.use("/api/resources", resourceRoutes);
+
 app.use("/api/questions", questionRoutes);
+
 app.use("/api/groups", groupRoutes);
+
 app.use("/api/users", userRoutes);
+
 app.use("/api/bookmarks", bookmarkRoutes);
+
 app.use(
   "/api/group-posts",
   groupPostRoutes
 );
+
 app.use(
   "/api/group-replies",
   groupReplyRoutes
 );
+
 app.use(
   "/api/group-questions",
   groupQuestionRoutes
 );
+
 app.use(
   "/api/group-resources",
   groupResourceRoutes
 );
+
+// ======================================================
+// Start Server
+// ======================================================
+
 app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+  console.log(
+    `Server running on http://localhost:${PORT}`
+  );
 });
