@@ -1,4 +1,42 @@
 const Resource = require("../models/Resource");
+const cloudinary = require("../config/cloudinary");
+
+// =========================
+// Upload PDF to Cloudinary
+// =========================
+
+const uploadPdfToCloudinary = (
+  buffer,
+  originalName
+) => {
+  return new Promise((resolve, reject) => {
+    const sanitizedName = originalName
+      .replace(/\.pdf$/i, "")
+      .replace(/[^a-zA-Z0-9-_]/g, "-")
+      .toLowerCase();
+
+    const publicId =
+      `studyspace/resources/${Date.now()}-${sanitizedName}`;
+
+    const uploadStream =
+      cloudinary.uploader.upload_stream(
+        {
+          resource_type: "image",
+          public_id: publicId,
+          format: "pdf",
+        },
+        (error, result) => {
+          if (error) {
+            reject(error);
+          } else {
+            resolve(result);
+          }
+        }
+      );
+
+    uploadStream.end(buffer);
+  });
+};
 
 // =========================
 // Get All Resources
@@ -44,10 +82,14 @@ const createResource = async (req, res) => {
       link,
     } = req.body;
 
+    // Basic validation
     if (
       !title ||
+      !title.trim() ||
       !subject ||
-      !description
+      !subject.trim() ||
+      !description ||
+      !description.trim()
     ) {
       return res.status(400).json({
         message:
@@ -55,13 +97,73 @@ const createResource = async (req, res) => {
       });
     }
 
+    // =========================
+    // PDF Upload
+    // =========================
+
+    if (req.file) {
+      if (
+        req.file.mimetype !==
+        "application/pdf"
+      ) {
+        return res.status(400).json({
+          message:
+            "Only PDF files are allowed.",
+        });
+      }
+
+      const uploadResult =
+        await uploadPdfToCloudinary(
+          req.file.buffer,
+          req.file.originalname
+        );
+
+      const resource =
+        await Resource.create({
+          title: title.trim(),
+          subject: subject.trim(),
+          description: description.trim(),
+          type: "PDF",
+          link: uploadResult.secure_url,
+          sourceType: "pdf",
+          cloudinaryPublicId:
+            uploadResult.public_id,
+          uploadedBy: req.user._id,
+        });
+
+      const populatedResource =
+        await Resource.findById(
+          resource._id
+        ).populate(
+          "uploadedBy",
+          "name email"
+        );
+
+      return res.status(201).json(
+        populatedResource
+      );
+    }
+
+    // =========================
+    // Normal Link Resource
+    // =========================
+
+    if (!link || !link.trim()) {
+      return res.status(400).json({
+        message:
+          "Please provide a resource link or upload a PDF.",
+      });
+    }
+
     const resource =
       await Resource.create({
-        title,
-        subject,
-        description,
-        type,
-        link,
+        title: title.trim(),
+        subject: subject.trim(),
+        description: description.trim(),
+        type: type || "Notes",
+        link: link.trim(),
+        sourceType: "link",
+        cloudinaryPublicId: null,
         uploadedBy: req.user._id,
       });
 
@@ -138,11 +240,22 @@ const updateResource = async (
       description ??
       resource.description;
 
-    resource.type =
-      type ?? resource.type;
+    // For an uploaded PDF, keep the type as PDF.
+    if (resource.sourceType === "pdf") {
+      resource.type = "PDF";
+    } else {
+      resource.type =
+        type ?? resource.type;
+    }
 
-    resource.link =
-      link ?? resource.link;
+    // Do not replace a PDF's Cloudinary link
+    // with an empty/missing link during edit.
+    if (
+      resource.sourceType === "link"
+    ) {
+      resource.link =
+        link ?? resource.link;
+    }
 
     await resource.save();
 
@@ -199,6 +312,31 @@ const deleteResource = async (
         message:
           "You can only delete your own resources",
       });
+    }
+
+    // =========================
+    // Delete PDF from Cloudinary
+    // =========================
+
+    if (
+      resource.sourceType === "pdf" &&
+      resource.cloudinaryPublicId
+    ) {
+      try {
+        await cloudinary.uploader.destroy(
+          resource.cloudinaryPublicId,
+          {
+            resource_type: "image",
+            type: "upload",
+            invalidate: true,
+          }
+        );
+      } catch (cloudinaryError) {
+        console.error(
+          "Cloudinary delete error:",
+          cloudinaryError.message
+        );
+      }
     }
 
     await resource.deleteOne();

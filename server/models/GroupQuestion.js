@@ -1,28 +1,11 @@
 const mongoose = require("mongoose");
 
-const questionSchema = new mongoose.Schema(
+const groupQuestionSchema = new mongoose.Schema(
   {
-    title: {
-      type: String,
+    group: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "StudyGroup",
       required: true,
-      trim: true,
-    },
-
-    description: {
-      type: String,
-      required: true,
-      trim: true,
-    },
-
-    subject: {
-      type: String,
-      required: true,
-      trim: true,
-    },
-
-    tags: {
-      type: [String],
-      default: [],
     },
 
     author: {
@@ -31,7 +14,22 @@ const questionSchema = new mongoose.Schema(
       required: true,
     },
 
-    // Answers posted by other logged-in users
+    title: {
+      type: String,
+      required: true,
+      trim: true,
+      minlength: 3,
+      maxlength: 200,
+    },
+
+    content: {
+      type: String,
+      required: true,
+      trim: true,
+      minlength: 1,
+      maxlength: 2000,
+    },
+
     answers: [
       {
         author: {
@@ -60,9 +58,9 @@ const questionSchema = new mongoose.Schema(
   }
 );
 
-const Question = mongoose.model(
-  "Question",
-  questionSchema
+const GroupQuestion = mongoose.model(
+  "GroupQuestion",
+  groupQuestionSchema
 );
 
-module.exports = Question;
+module.exports = GroupQuestion;

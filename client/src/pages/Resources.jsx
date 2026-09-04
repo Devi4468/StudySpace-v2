@@ -1,4 +1,9 @@
-import { useEffect, useState } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+
 import { useAuth } from "../context/AuthContext";
 import BackButton from "../components/BackButton";
 import apiRequest from "../services/api";
@@ -10,28 +15,65 @@ function Resources({
 }) {
   const { user } = useAuth();
 
-  const [resources, setResources] = useState([]);
-  const [search, setSearch] = useState("");
-  const [category, setCategory] = useState(
-    selectedSubject || "All"
-  );
+  const [resources, setResources] =
+    useState([]);
 
-  const [loading, setLoading] = useState(true);
+  const [search, setSearch] =
+    useState("");
 
-  const [showForm, setShowForm] = useState(false);
+  const [category, setCategory] =
+    useState(
+      selectedSubject || "All"
+    );
+
+  const [loading, setLoading] =
+    useState(true);
+
+  const [showForm, setShowForm] =
+    useState(false);
+
   const [editingResource, setEditingResource] =
     useState(null);
 
-  const [bookmarkedResources, setBookmarkedResources] =
-    useState([]);
+  const [
+    bookmarkedResources,
+    setBookmarkedResources,
+  ] = useState([]);
 
-  const [formData, setFormData] = useState({
-    title: "",
-    subject: "",
-    description: "",
-    type: "Notes",
-    link: "",
-  });
+  // =========================
+  // PDF Upload State
+  // =========================
+
+  const [
+    resourceSourceType,
+    setResourceSourceType,
+  ] = useState("link");
+
+  const [
+    resourceFile,
+    setResourceFile,
+  ] = useState(null);
+
+  const [
+    resourceUploading,
+    setResourceUploading,
+  ] = useState(false);
+
+  const resourceFileInputRef =
+    useRef(null);
+
+  // =========================
+  // Form Data
+  // =========================
+
+  const [formData, setFormData] =
+    useState({
+      title: "",
+      subject: "",
+      description: "",
+      type: "Notes",
+      link: "",
+    });
 
   const categories = [
     "All",
@@ -59,9 +101,8 @@ function Resources({
 
   const fetchResources = async () => {
     try {
-      const data = await apiRequest(
-        "/resources"
-      );
+      const data =
+        await apiRequest("/resources");
 
       setResources(
         Array.isArray(data)
@@ -89,23 +130,25 @@ function Resources({
 
   const fetchBookmarks = async () => {
     try {
-      const data = await apiRequest(
-        "/bookmarks"
+      const data =
+        await apiRequest("/bookmarks");
+
+      const resourceIds =
+        Array.isArray(data)
+          ? data
+              .filter(
+                (bookmark) =>
+                  bookmark.resource?._id
+              )
+              .map(
+                (bookmark) =>
+                  bookmark.resource._id
+              )
+          : [];
+
+      setBookmarkedResources(
+        resourceIds
       );
-
-      const resourceIds = Array.isArray(data)
-        ? data
-            .filter(
-              (bookmark) =>
-                bookmark.resource?._id
-            )
-            .map(
-              (bookmark) =>
-                bookmark.resource._id
-            )
-        : [];
-
-      setBookmarkedResources(resourceIds);
     } catch (error) {
       console.error(
         "Error fetching bookmarks:",
@@ -125,7 +168,9 @@ function Resources({
 
   useEffect(() => {
     if (selectedSubject) {
-      setCategory(selectedSubject);
+      setCategory(
+        selectedSubject
+      );
     }
   }, [selectedSubject]);
 
@@ -198,8 +243,92 @@ function Resources({
   const handleChange = (e) => {
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value,
+      [e.target.name]:
+        e.target.value,
     });
+  };
+
+  // =========================
+  // Handle Source Type
+  // =========================
+
+  const handleSourceChange = (
+    sourceType
+  ) => {
+    setResourceSourceType(
+      sourceType
+    );
+
+    if (sourceType === "link") {
+      setResourceFile(null);
+
+      if (
+        resourceFileInputRef.current
+      ) {
+        resourceFileInputRef.current.value =
+          "";
+      }
+
+      setFormData(
+        (current) => ({
+          ...current,
+          type:
+            current.type === "PDF"
+              ? "Notes"
+              : current.type,
+        })
+      );
+    } else {
+      setFormData(
+        (current) => ({
+          ...current,
+          link: "",
+          type: "PDF",
+        })
+      );
+    }
+  };
+
+  // =========================
+  // Handle PDF Selection
+  // =========================
+
+  const handleFileChange = (e) => {
+    const file =
+      e.target.files?.[0];
+
+    if (!file) {
+      setResourceFile(null);
+      return;
+    }
+
+    if (
+      file.type !==
+      "application/pdf"
+    ) {
+      alert(
+        "Please select a PDF file only."
+      );
+
+      e.target.value = "";
+      setResourceFile(null);
+      return;
+    }
+
+    const maxSize =
+      10 * 1024 * 1024;
+
+    if (file.size > maxSize) {
+      alert(
+        "PDF file is too large. Maximum allowed size is 10 MB."
+      );
+
+      e.target.value = "";
+      setResourceFile(null);
+      return;
+    }
+
+    setResourceFile(file);
   };
 
   // =========================
@@ -217,6 +346,19 @@ function Resources({
       link: "",
     });
 
+    setResourceSourceType(
+      "link"
+    );
+
+    setResourceFile(null);
+
+    if (
+      resourceFileInputRef.current
+    ) {
+      resourceFileInputRef.current.value =
+        "";
+    }
+
     setShowForm(true);
   };
 
@@ -224,16 +366,45 @@ function Resources({
   // Open Edit Form
   // =========================
 
-  const openEditForm = (resource) => {
+  const openEditForm = (
+    resource
+  ) => {
     setEditingResource(resource);
 
+    const isPdf =
+      resource.sourceType ===
+        "pdf" ||
+      resource.type === "PDF";
+
     setFormData({
-      title: resource.title,
-      subject: resource.subject,
-      description: resource.description,
-      type: resource.type,
-      link: resource.link || "",
+      title:
+        resource.title || "",
+      subject:
+        resource.subject || "",
+      description:
+        resource.description || "",
+      type:
+        resource.type || "Notes",
+      link:
+        isPdf
+          ? ""
+          : resource.link || "",
     });
+
+    setResourceSourceType(
+      isPdf
+        ? "pdf"
+        : "link"
+    );
+
+    setResourceFile(null);
+
+    if (
+      resourceFileInputRef.current
+    ) {
+      resourceFileInputRef.current.value =
+        "";
+    }
 
     setShowForm(true);
   };
@@ -253,64 +424,226 @@ function Resources({
       type: "Notes",
       link: "",
     });
+
+    setResourceSourceType(
+      "link"
+    );
+
+    setResourceFile(null);
+
+    if (
+      resourceFileInputRef.current
+    ) {
+      resourceFileInputRef.current.value =
+        "";
+    }
+
+    setResourceUploading(false);
   };
 
   // =========================
   // Create / Update Resource
   // =========================
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (
+    e
+  ) => {
     e.preventDefault();
 
-    try {
-      let data;
+    if (resourceUploading) {
+      return;
+    }
 
-      const requestData = {
-        title: formData.title,
-        subject: formData.subject,
-        description: formData.description,
-        type: formData.type,
-        link: formData.link,
-      };
+    // =========================
+    // EDIT EXISTING RESOURCE
+    // =========================
 
-      if (editingResource) {
-        data = await apiRequest(
-          `/resources/${editingResource._id}`,
-          {
-            method: "PUT",
-            body: JSON.stringify(
-              requestData
-            ),
-          }
-        );
+    if (editingResource) {
+      try {
+        const isPdf =
+          editingResource.sourceType ===
+            "pdf" ||
+          editingResource.type ===
+            "PDF";
+
+        const requestData = {
+          title:
+            formData.title.trim(),
+          subject:
+            formData.subject.trim(),
+          description:
+            formData.description.trim(),
+          type: isPdf
+            ? "PDF"
+            : formData.type,
+          link: isPdf
+            ? editingResource.link
+            : formData.link.trim(),
+        };
+
+        const data =
+          await apiRequest(
+            `/resources/${editingResource._id}`,
+            {
+              method: "PUT",
+              body: JSON.stringify(
+                requestData
+              ),
+            }
+          );
 
         setResources(
           (currentResources) =>
             currentResources.map(
               (resource) =>
-                resource._id === data._id
+                resource._id ===
+                data._id
                   ? data
                   : resource
             )
         );
-      } else {
-        data = await apiRequest(
-          "/resources",
-          {
-            method: "POST",
-            body: JSON.stringify(
-              requestData
-            ),
-          }
+
+        closeForm();
+      } catch (error) {
+        console.error(
+          "Error updating resource:",
+          error
         );
 
-        setResources(
-          (currentResources) => [
-            data,
-            ...currentResources,
-          ]
+        alert(
+          error.message ||
+            "Could not update resource"
         );
       }
+
+      return;
+    }
+
+    // =========================
+    // VALIDATE NEW RESOURCE
+    // =========================
+
+    if (
+      !formData.title.trim() ||
+      !formData.subject.trim() ||
+      !formData.description.trim()
+    ) {
+      alert(
+        "Please fill in all required fields."
+      );
+      return;
+    }
+
+    if (
+      resourceSourceType === "link" &&
+      !formData.link.trim()
+    ) {
+      alert(
+        "Please enter a resource link."
+      );
+      return;
+    }
+
+    if (
+      resourceSourceType === "pdf" &&
+      !resourceFile
+    ) {
+      alert(
+        "Please select a PDF file."
+      );
+      return;
+    }
+
+    if (
+      resourceSourceType === "pdf" &&
+      resourceFile.size >
+        10 * 1024 * 1024
+    ) {
+      alert(
+        "PDF file is too large. Maximum allowed size is 10 MB."
+      );
+      return;
+    }
+
+    // =========================
+    // CREATE NEW RESOURCE
+    // =========================
+
+    try {
+      setResourceUploading(true);
+
+      let data;
+
+      if (
+        resourceSourceType === "pdf"
+      ) {
+        const dataToSend =
+          new FormData();
+
+        dataToSend.append(
+          "title",
+          formData.title.trim()
+        );
+
+        dataToSend.append(
+          "subject",
+          formData.subject.trim()
+        );
+
+        dataToSend.append(
+          "description",
+          formData.description.trim()
+        );
+
+        dataToSend.append(
+          "type",
+          "PDF"
+        );
+
+        dataToSend.append(
+          "file",
+          resourceFile
+        );
+
+        data =
+          await apiRequest(
+            "/resources",
+            {
+              method: "POST",
+              body: dataToSend,
+            }
+          );
+      } else {
+        const requestData = {
+          title:
+            formData.title.trim(),
+          subject:
+            formData.subject.trim(),
+          description:
+            formData.description.trim(),
+          type: formData.type,
+          link:
+            formData.link.trim(),
+        };
+
+        data =
+          await apiRequest(
+            "/resources",
+            {
+              method: "POST",
+              body: JSON.stringify(
+                requestData
+              ),
+            }
+          );
+      }
+
+      setResources(
+        (currentResources) => [
+          data,
+          ...currentResources,
+        ]
+      );
 
       closeForm();
     } catch (error) {
@@ -323,6 +656,8 @@ function Resources({
         error.message ||
           "Could not save resource"
       );
+    } finally {
+      setResourceUploading(false);
     }
   };
 
@@ -330,10 +665,13 @@ function Resources({
   // Delete Resource
   // =========================
 
-  const handleDelete = async (id) => {
-    const confirmed = window.confirm(
-      "Are you sure you want to delete this resource?"
-    );
+  const handleDelete = async (
+    id
+  ) => {
+    const confirmed =
+      window.confirm(
+        "Are you sure you want to delete this resource?"
+      );
 
     if (!confirmed) {
       return;
@@ -380,36 +718,52 @@ function Resources({
   // =========================
 
   const filteredResources =
-    resources.filter((resource) => {
-      const searchText =
-        search.toLowerCase();
+    resources.filter(
+      (resource) => {
+        const searchText =
+          search.toLowerCase();
 
-      const matchesSearch =
-        resource.title
-          .toLowerCase()
-          .includes(searchText) ||
-        resource.subject
-          .toLowerCase()
-          .includes(searchText) ||
-        resource.description
-          .toLowerCase()
-          .includes(searchText);
+        const title =
+          resource.title ||
+          "";
 
-      const matchesCategory =
-        category === "All" ||
-        resource.subject === category;
+        const subject =
+          resource.subject ||
+          "";
 
-      return (
-        matchesSearch &&
-        matchesCategory
-      );
-    });
+        const description =
+          resource.description ||
+          "";
+
+        const matchesSearch =
+          title
+            .toLowerCase()
+            .includes(searchText) ||
+          subject
+            .toLowerCase()
+            .includes(searchText) ||
+          description
+            .toLowerCase()
+            .includes(searchText);
+
+        const matchesCategory =
+          category === "All" ||
+          subject === category;
+
+        return (
+          matchesSearch &&
+          matchesCategory
+        );
+      }
+    );
 
   return (
     <div className="resources-page">
 
       <BackButton
-        setCurrentPage={setCurrentPage}
+        setCurrentPage={
+          setCurrentPage
+        }
       />
 
       {/* =========================
@@ -460,7 +814,9 @@ function Resources({
           placeholder="Search resources..."
           value={search}
           onChange={(e) =>
-            setSearch(e.target.value)
+            setSearch(
+              e.target.value
+            )
           }
         />
 
@@ -478,24 +834,31 @@ function Resources({
 
         <div className="category-list">
 
-          {categories.map((item) => (
+          {categories.map(
+            (item) => (
 
-            <button
-              key={item}
-              className={
-                category === item
-                  ? "category-btn active"
-                  : "category-btn"
-              }
-              onClick={() => {
-                setCategory(item);
-                setSelectedSubject(item);
-              }}
-            >
-              {item}
-            </button>
+              <button
+                key={item}
+                className={
+                  category === item
+                    ? "category-btn active"
+                    : "category-btn"
+                }
+                onClick={() => {
+                  setCategory(
+                    item
+                  );
 
-          ))}
+                  setSelectedSubject(
+                    item
+                  );
+                }}
+              >
+                {item}
+              </button>
+
+            )
+          )}
 
         </div>
 
@@ -512,7 +875,8 @@ function Resources({
         </h2>
 
         <span>
-          {filteredResources.length} resources
+          {filteredResources.length}{" "}
+          resources
         </span>
 
       </div>
@@ -535,7 +899,8 @@ function Resources({
 
         </div>
 
-      ) : filteredResources.length > 0 ? (
+      ) : filteredResources.length >
+        0 ? (
 
         <div className="resource-grid">
 
@@ -547,13 +912,18 @@ function Resources({
                 "Student";
 
               const isOwner =
-                resource.uploadedBy?.name ===
-                user?.name;
+                resource.uploadedBy
+                  ?.name === user?.name;
 
               const isBookmarked =
                 bookmarkedResources.includes(
                   resource._id
                 );
+
+              const isPdf =
+                resource.sourceType ===
+                  "pdf" ||
+                resource.type === "PDF";
 
               return (
 
@@ -565,7 +935,9 @@ function Resources({
                   <div className="resource-card-top">
 
                     <div className="resource-icon">
-                      📄
+                      {isPdf
+                        ? "📄"
+                        : "📚"}
                     </div>
 
                     <span className="resource-type">
@@ -586,17 +958,21 @@ function Resources({
                     {resource.description}
                   </p>
 
-                  {/* Resource Link */}
+                  {/* Open Resource */}
 
                   {resource.link ? (
 
                     <a
-                      href={resource.link}
+                      href={
+                        resource.link
+                      }
                       target="_blank"
                       rel="noreferrer"
                       className="open-resource-btn"
                     >
-                      Open Resource →
+                      {isPdf
+                        ? "📄 Open PDF →"
+                        : "🔗 Open Resource →"}
                     </a>
 
                   ) : (
@@ -712,9 +1088,31 @@ function Resources({
 
       {showForm && (
 
-        <div className="modal-overlay">
+        <div
+          className="modal-overlay"
+          style={{
+            overflowY: "auto",
+            padding:
+              "20px",
+            alignItems:
+              "flex-start",
+          }}
+        >
 
-          <div className="resource-modal">
+          <div
+            className="resource-modal"
+            style={{
+              width: "100%",
+              maxWidth:
+                "560px",
+              maxHeight:
+                "calc(100vh - 40px)",
+              overflowY:
+                "auto",
+              margin:
+                "0 auto",
+            }}
+          >
 
             <div className="modal-header">
 
@@ -738,6 +1136,9 @@ function Resources({
                 type="button"
                 className="close-btn"
                 onClick={closeForm}
+                disabled={
+                  resourceUploading
+                }
               >
                 ✕
               </button>
@@ -748,6 +1149,8 @@ function Resources({
               onSubmit={handleSubmit}
             >
 
+              {/* Resource Title */}
+
               <label>
                 Resource Title
               </label>
@@ -756,10 +1159,16 @@ function Resources({
                 type="text"
                 name="title"
                 placeholder="Eg: Python Complete Notes"
-                value={formData.title}
-                onChange={handleChange}
+                value={
+                  formData.title
+                }
+                onChange={
+                  handleChange
+                }
                 required
               />
+
+              {/* Subject */}
 
               <label>
                 Subject
@@ -770,8 +1179,12 @@ function Resources({
                 name="subject"
                 list="resource-subject-options"
                 placeholder="Eg: Python, AWS, Cloud Computing"
-                value={formData.subject}
-                onChange={handleChange}
+                value={
+                  formData.subject
+                }
+                onChange={
+                  handleChange
+                }
                 required
               />
 
@@ -796,6 +1209,8 @@ function Resources({
 
               </datalist>
 
+              {/* Description */}
+
               <label>
                 Description
               </label>
@@ -807,9 +1222,13 @@ function Resources({
                 value={
                   formData.description
                 }
-                onChange={handleChange}
+                onChange={
+                  handleChange
+                }
                 required
               />
+
+              {/* Resource Type */}
 
               <label>
                 Resource Type
@@ -817,43 +1236,337 @@ function Resources({
 
               <select
                 name="type"
-                value={formData.type}
-                onChange={handleChange}
+                value={
+                  resourceSourceType ===
+                  "pdf"
+                    ? "PDF"
+                    : formData.type
+                }
+                onChange={
+                  handleChange
+                }
+                disabled={
+                  resourceSourceType ===
+                  "pdf"
+                }
               >
 
-                <option>
+                <option value="Notes">
                   Notes
                 </option>
 
-                <option>
+                <option value="Tutorial">
                   Tutorial
                 </option>
 
-                <option>
+                <option value="Video">
                   Video
                 </option>
 
-                <option>
+                <option value="Article">
                   Article
                 </option>
 
-                <option>
+                <option value="PDF">
                   PDF
                 </option>
 
               </select>
 
-              <label>
-                Resource Link
-              </label>
+              {/* =========================
+                  Share Type
+                  ========================= */}
 
-              <input
-                type="url"
-                name="link"
-                placeholder="https://example.com"
-                value={formData.link}
-                onChange={handleChange}
-              />
+              {!editingResource && (
+
+                <>
+                  <label>
+                    How do you want to share it?
+                  </label>
+
+                  <div
+                    className="resource-source-options"
+                    style={{
+                      display:
+                        "flex",
+                      gap: "10px",
+                      marginBottom:
+                        "15px",
+                    }}
+                  >
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleSourceChange(
+                          "link"
+                        )
+                      }
+                      disabled={
+                        resourceUploading
+                      }
+                      style={{
+                        flex: 1,
+                        padding:
+                          "12px",
+                        border:
+                          resourceSourceType ===
+                          "link"
+                            ? "2px solid #2563eb"
+                            : "1px solid #d1d5db",
+                        borderRadius:
+                          "8px",
+                        background:
+                          resourceSourceType ===
+                          "link"
+                            ? "#eff6ff"
+                            : "#ffffff",
+                        cursor:
+                          resourceUploading
+                            ? "not-allowed"
+                            : "pointer",
+                        fontWeight:
+                          "600",
+                      }}
+                    >
+                      🔗 Share Link
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleSourceChange(
+                          "pdf"
+                        )
+                      }
+                      disabled={
+                        resourceUploading
+                      }
+                      style={{
+                        flex: 1,
+                        padding:
+                          "12px",
+                        border:
+                          resourceSourceType ===
+                          "pdf"
+                            ? "2px solid #2563eb"
+                            : "1px solid #d1d5db",
+                        borderRadius:
+                          "8px",
+                        background:
+                          resourceSourceType ===
+                          "pdf"
+                            ? "#eff6ff"
+                            : "#ffffff",
+                        cursor:
+                          resourceUploading
+                            ? "not-allowed"
+                            : "pointer",
+                        fontWeight:
+                          "600",
+                      }}
+                    >
+                      📄 Upload PDF
+                    </button>
+
+                  </div>
+                </>
+
+              )}
+
+              {/* =========================
+                  Link Input
+                  ========================= */}
+
+              {(
+                editingResource
+                  ? editingResource.sourceType !==
+                    "pdf"
+                  : resourceSourceType ===
+                    "link"
+              ) && (
+
+                <>
+                  <label>
+                    Resource Link
+                  </label>
+
+                  <input
+                    type="url"
+                    name="link"
+                    placeholder="https://example.com"
+                    value={
+                      formData.link
+                    }
+                    onChange={
+                      handleChange
+                    }
+                    required={
+                      !editingResource
+                    }
+                  />
+                </>
+
+              )}
+
+              {/* =========================
+                  PDF Input
+                  ========================= */}
+
+              {!editingResource &&
+                resourceSourceType ===
+                  "pdf" && (
+
+                  <>
+                    <label>
+                      Select PDF
+                    </label>
+
+                    <input
+                      ref={
+                        resourceFileInputRef
+                      }
+                      id="resource-pdf-file"
+                      type="file"
+                      accept="application/pdf,.pdf"
+                      onChange={
+                        handleFileChange
+                      }
+                      disabled={
+                        resourceUploading
+                      }
+                    />
+
+                    <p
+                      style={{
+                        marginTop:
+                          "6px",
+                        fontSize:
+                          "13px",
+                        color:
+                          "#6b7280",
+                      }}
+                    >
+                      Maximum PDF size:
+                      10 MB
+                    </p>
+
+                    {resourceFile && (
+
+                      <div
+                        style={{
+                          marginTop:
+                            "10px",
+                          padding:
+                            "10px 12px",
+                          border:
+                            "1px solid #d1d5db",
+                          borderRadius:
+                            "8px",
+                          background:
+                            "#f9fafb",
+                        }}
+                      >
+                        📄{" "}
+
+                        <strong>
+                          {
+                            resourceFile.name
+                          }
+                        </strong>
+
+                        <span
+                          style={{
+                            marginLeft:
+                              "8px",
+                            color:
+                              "#6b7280",
+                          }}
+                        >
+                          (
+                          {(
+                            resourceFile.size /
+                            (1024 *
+                              1024)
+                          ).toFixed(
+                            2
+                          )}{" "}
+                          MB)
+                        </span>
+                      </div>
+
+                    )}
+
+                    <p
+                      style={{
+                        marginTop:
+                          "8px",
+                        fontSize:
+                          "12px",
+                        color:
+                          "#6b7280",
+                      }}
+                    >
+                      💡 Only upload PDFs
+                      that you own or have
+                      permission to share.
+                    </p>
+                  </>
+
+                )}
+
+              {/* Existing PDF during edit */}
+
+              {editingResource &&
+                (
+                  editingResource.sourceType ===
+                    "pdf" ||
+                  editingResource.type ===
+                    "PDF"
+                ) && (
+
+                  <div
+                    style={{
+                      padding:
+                        "12px",
+                      marginTop:
+                        "8px",
+                      marginBottom:
+                        "15px",
+                      border:
+                        "1px solid #d1d5db",
+                      borderRadius:
+                        "8px",
+                      background:
+                        "#f9fafb",
+                    }}
+                  >
+                    📄 This resource is
+                    an uploaded PDF.
+
+                    <br />
+
+                    <a
+                      href={
+                        editingResource.link
+                      }
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{
+                        display:
+                          "inline-block",
+                        marginTop:
+                          "8px",
+                      }}
+                    >
+                      Open current PDF →
+                    </a>
+
+                  </div>
+
+                )}
+
+              {/* Logged in user */}
 
               <div className="logged-in-user">
 
@@ -868,12 +1581,19 @@ function Resources({
 
               </div>
 
+              {/* Modal Actions */}
+
               <div className="modal-actions">
 
                 <button
                   type="button"
                   className="cancel-btn"
-                  onClick={closeForm}
+                  onClick={
+                    closeForm
+                  }
+                  disabled={
+                    resourceUploading
+                  }
                 >
                   Cancel
                 </button>
@@ -881,9 +1601,17 @@ function Resources({
                 <button
                   type="submit"
                   className="submit-btn"
+                  disabled={
+                    resourceUploading
+                  }
                 >
-                  {editingResource
+                  {resourceUploading
+                    ? "Uploading..."
+                    : editingResource
                     ? "Save Changes"
+                    : resourceSourceType ===
+                      "pdf"
+                    ? "📄 Upload PDF"
                     : "Add Resource"}
                 </button>
 

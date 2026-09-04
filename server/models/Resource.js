@@ -33,10 +33,28 @@ const resourceSchema = new mongoose.Schema(
       default: "Notes",
     },
 
+    // link is used for both normal URLs
+    // and the Cloudinary URL of uploaded PDFs.
     link: {
       type: String,
       default: "",
       trim: true,
+    },
+
+    // Tells us whether the resource came from
+    // a normal URL or an uploaded PDF.
+    sourceType: {
+      type: String,
+      enum: ["link", "pdf"],
+      default: "link",
+    },
+
+    // Used only for PDFs uploaded to Cloudinary.
+    // This allows us to remove the PDF from Cloudinary
+    // when the resource is deleted.
+    cloudinaryPublicId: {
+      type: String,
+      default: null,
     },
 
     uploadedBy: {

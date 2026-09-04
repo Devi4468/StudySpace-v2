@@ -20,6 +20,23 @@ function Questions({ setCurrentPage }) {
   const [bookmarkedQuestions, setBookmarkedQuestions] =
     useState([]);
 
+  // =========================
+  // Answer States
+  // =========================
+
+  const [showAnswers, setShowAnswers] = useState({});
+
+  const [answerContent, setAnswerContent] = useState({});
+
+  const [editingAnswer, setEditingAnswer] =
+    useState(null);
+
+  const [editingAnswerContent, setEditingAnswerContent] =
+    useState("");
+
+  const [answerLoading, setAnswerLoading] =
+    useState({});
+
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -116,7 +133,7 @@ function Questions({ setCurrentPage }) {
   }, []);
 
   // =========================
-  // Handle Bookmark
+  // Bookmark Question
   // =========================
 
   const handleBookmark = async (
@@ -178,7 +195,7 @@ function Questions({ setCurrentPage }) {
   };
 
   // =========================
-  // Handle Input Changes
+  // Form Handling
   // =========================
 
   const handleChange = (e) => {
@@ -187,10 +204,6 @@ function Questions({ setCurrentPage }) {
       [e.target.name]: e.target.value,
     });
   };
-
-  // =========================
-  // Open Add Question Form
-  // =========================
 
   const openAddForm = () => {
     setEditingQuestion(null);
@@ -204,10 +217,6 @@ function Questions({ setCurrentPage }) {
 
     setShowForm(true);
   };
-
-  // =========================
-  // Open Edit Question Form
-  // =========================
 
   const openEditForm = (question) => {
     setEditingQuestion(question);
@@ -223,10 +232,6 @@ function Questions({ setCurrentPage }) {
 
     setShowForm(true);
   };
-
-  // =========================
-  // Close Form
-  // =========================
 
   const closeForm = () => {
     setShowForm(false);
@@ -368,6 +373,244 @@ function Questions({ setCurrentPage }) {
   };
 
   // =========================
+  // Toggle Answers
+  // =========================
+
+  const toggleAnswers = (questionId) => {
+    setShowAnswers(
+      (current) => ({
+        ...current,
+        [questionId]:
+          !current[questionId],
+      })
+    );
+  };
+
+  // =========================
+  // Answer Input
+  // =========================
+
+  const handleAnswerChange = (
+    questionId,
+    value
+  ) => {
+    setAnswerContent(
+      (current) => ({
+        ...current,
+        [questionId]: value,
+      })
+    );
+  };
+
+  // =========================
+  // Add Answer
+  // =========================
+
+  const handleAddAnswer = async (
+    questionId
+  ) => {
+    const content =
+      answerContent[questionId]?.trim();
+
+    if (!content) {
+      alert(
+        "Please write an answer before posting."
+      );
+      return;
+    }
+
+    setAnswerLoading(
+      (current) => ({
+        ...current,
+        [questionId]: true,
+      })
+    );
+
+    try {
+      const updatedQuestion =
+        await apiRequest(
+          `/questions/${questionId}/answers`,
+          {
+            method: "POST",
+            body: JSON.stringify({
+              content,
+            }),
+          }
+        );
+
+      setQuestions(
+        (currentQuestions) =>
+          currentQuestions.map(
+            (question) =>
+              question._id === questionId
+                ? updatedQuestion
+                : question
+          )
+      );
+
+      setAnswerContent(
+        (current) => ({
+          ...current,
+          [questionId]: "",
+        })
+      );
+
+      setShowAnswers(
+        (current) => ({
+          ...current,
+          [questionId]: true,
+        })
+      );
+    } catch (error) {
+      console.error(
+        "Error adding answer:",
+        error
+      );
+
+      alert(
+        error.message ||
+          "Could not post answer"
+      );
+    } finally {
+      setAnswerLoading(
+        (current) => ({
+          ...current,
+          [questionId]: false,
+        })
+      );
+    }
+  };
+
+  // =========================
+  // Start Editing Answer
+  // =========================
+
+  const startEditAnswer = (
+    questionId,
+    answer
+  ) => {
+    setEditingAnswer({
+      questionId,
+      answerId: answer._id,
+    });
+
+    setEditingAnswerContent(
+      answer.content
+    );
+  };
+
+  // =========================
+  // Cancel Edit Answer
+  // =========================
+
+  const cancelEditAnswer = () => {
+    setEditingAnswer(null);
+    setEditingAnswerContent("");
+  };
+
+  // =========================
+  // Update Answer
+  // =========================
+
+  const handleUpdateAnswer = async () => {
+    if (
+      !editingAnswer ||
+      !editingAnswerContent.trim()
+    ) {
+      return;
+    }
+
+    const {
+      questionId,
+      answerId,
+    } = editingAnswer;
+
+    try {
+      const updatedQuestion =
+        await apiRequest(
+          `/questions/${questionId}/answers/${answerId}`,
+          {
+            method: "PUT",
+            body: JSON.stringify({
+              content:
+                editingAnswerContent.trim(),
+            }),
+          }
+        );
+
+      setQuestions(
+        (currentQuestions) =>
+          currentQuestions.map(
+            (question) =>
+              question._id === questionId
+                ? updatedQuestion
+                : question
+          )
+      );
+
+      cancelEditAnswer();
+    } catch (error) {
+      console.error(
+        "Error updating answer:",
+        error
+      );
+
+      alert(
+        error.message ||
+          "Could not update answer"
+      );
+    }
+  };
+
+  // =========================
+  // Delete Answer
+  // =========================
+
+  const handleDeleteAnswer = async (
+    questionId,
+    answerId
+  ) => {
+    const confirmed =
+      window.confirm(
+        "Are you sure you want to delete this answer?"
+      );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      const updatedQuestion =
+        await apiRequest(
+          `/questions/${questionId}/answers/${answerId}`,
+          {
+            method: "DELETE",
+          }
+        );
+
+      setQuestions(
+        (currentQuestions) =>
+          currentQuestions.map(
+            (question) =>
+              question._id === questionId
+                ? updatedQuestion
+                : question
+          )
+      );
+    } catch (error) {
+      console.error(
+        "Error deleting answer:",
+        error
+      );
+
+      alert(
+        error.message ||
+          "Could not delete answer"
+      );
+    }
+  };
+
+  // =========================
   // Filter Questions
   // =========================
 
@@ -498,7 +741,7 @@ function Questions({ setCurrentPage }) {
       </div>
 
       {/* =========================
-          Questions Heading
+          Question Heading
       ========================= */}
 
       <div className="resource-heading">
@@ -514,7 +757,7 @@ function Questions({ setCurrentPage }) {
       </div>
 
       {/* =========================
-          Questions List
+          Loading
       ========================= */}
 
       {loading ? (
@@ -553,12 +796,31 @@ function Questions({ setCurrentPage }) {
                   question._id
                 );
 
+              const answers =
+                Array.isArray(
+                  question.answers
+                )
+                  ? question.answers
+                  : [];
+
+              const answerCount =
+                answers.length;
+
+              const isShowingAnswers =
+                showAnswers[
+                  question._id
+                ];
+
               return (
 
                 <div
                   className="question-card"
                   key={question._id}
                 >
+
+                  {/* =========================
+                      Question Header
+                  ========================= */}
 
                   <div className="question-card-header">
 
@@ -572,6 +834,10 @@ function Questions({ setCurrentPage }) {
 
                   </div>
 
+                  {/* =========================
+                      Question
+                  ========================= */}
+
                   <h3>
                     {question.title}
                   </h3>
@@ -580,7 +846,9 @@ function Questions({ setCurrentPage }) {
                     {question.description}
                   </p>
 
-                  {/* Tags */}
+                  {/* =========================
+                      Tags
+                  ========================= */}
 
                   {question.tags &&
                     question.tags.length >
@@ -604,7 +872,9 @@ function Questions({ setCurrentPage }) {
 
                   )}
 
-                  {/* Footer */}
+                  {/* =========================
+                      Question Footer
+                  ========================= */}
 
                   <div className="question-footer">
 
@@ -618,7 +888,9 @@ function Questions({ setCurrentPage }) {
 
                   </div>
 
-                  {/* Bookmark */}
+                  {/* =========================
+                      Bookmark
+                  ========================= */}
 
                   <button
                     type="button"
@@ -638,7 +910,9 @@ function Questions({ setCurrentPage }) {
                       : "🔖 Bookmark"}
                   </button>
 
-                  {/* Owner Actions */}
+                  {/* =========================
+                      Question Actions
+                  ========================= */}
 
                   {isOwner && (
 
@@ -672,6 +946,283 @@ function Questions({ setCurrentPage }) {
 
                   )}
 
+                  {/* =========================
+                      Answers Section
+                  ========================= */}
+
+                  <div className="public-answers-section">
+
+                    <button
+                      type="button"
+                      className="answers-toggle-btn"
+                      onClick={() =>
+                        toggleAnswers(
+                          question._id
+                        )
+                      }
+                    >
+                      💬{" "}
+                      {answerCount === 0
+                        ? "Answer"
+                        : `${answerCount} ${
+                            answerCount === 1
+                              ? "Answer"
+                              : "Answers"
+                          }`}
+
+                      <span>
+                        {isShowingAnswers
+                          ? "▲"
+                          : "▼"}
+                      </span>
+
+                    </button>
+
+                    {isShowingAnswers && (
+
+                      <div className="answers-container">
+
+                        {/* =========================
+                            Existing Answers
+                        ========================= */}
+
+                        {answers.length > 0 ? (
+
+                          <div className="answer-list">
+
+                            {answers.map(
+                              (answer) => {
+
+                                const answerAuthor =
+                                  answer.author?.name ||
+                                  "Student";
+
+                                const isAnswerOwner =
+                                  answer.author?._id ===
+                                    user?.id ||
+                                  answer.author?._id ===
+                                    user?._id;
+
+                                const isEditing =
+                                  editingAnswer?.questionId ===
+                                    question._id &&
+                                  editingAnswer?.answerId ===
+                                    answer._id;
+
+                                return (
+
+                                  <div
+                                    className="answer-card"
+                                    key={
+                                      answer._id
+                                    }
+                                  >
+
+                                    <div className="answer-header">
+
+                                      <div className="answer-avatar">
+                                        👤
+                                      </div>
+
+                                      <div className="answer-author-info">
+
+                                        <strong>
+                                          {answerAuthor}
+                                        </strong>
+
+                                        <span>
+                                          Answered
+                                        </span>
+
+                                      </div>
+
+                                    </div>
+
+                                    {isEditing ? (
+
+                                      <div className="answer-edit-box">
+
+                                        <textarea
+                                          rows="4"
+                                          value={
+                                            editingAnswerContent
+                                          }
+                                          onChange={(e) =>
+                                            setEditingAnswerContent(
+                                              e.target.value
+                                            )
+                                          }
+                                          placeholder="Update your answer..."
+                                        />
+
+                                        <div className="answer-edit-actions">
+
+                                          <button
+                                            type="button"
+                                            className="cancel-answer-btn"
+                                            onClick={
+                                              cancelEditAnswer
+                                            }
+                                          >
+                                            Cancel
+                                          </button>
+
+                                          <button
+                                            type="button"
+                                            className="save-answer-btn"
+                                            onClick={
+                                              handleUpdateAnswer
+                                            }
+                                          >
+                                            Save Answer
+                                          </button>
+
+                                        </div>
+
+                                      </div>
+
+                                    ) : (
+
+                                      <p className="answer-content">
+                                        {answer.content}
+                                      </p>
+
+                                    )}
+
+                                    {!isEditing &&
+                                      isAnswerOwner && (
+
+                                      <div className="answer-actions">
+
+                                        <button
+                                          type="button"
+                                          className="edit-answer-btn"
+                                          onClick={() =>
+                                            startEditAnswer(
+                                              question._id,
+                                              answer
+                                            )
+                                          }
+                                        >
+                                          ✏️ Edit
+                                        </button>
+
+                                        <button
+                                          type="button"
+                                          className="delete-answer-btn"
+                                          onClick={() =>
+                                            handleDeleteAnswer(
+                                              question._id,
+                                              answer._id
+                                            )
+                                          }
+                                        >
+                                          🗑️ Delete
+                                        </button>
+
+                                      </div>
+
+                                    )}
+
+                                  </div>
+
+                                );
+                              }
+                            )}
+
+                          </div>
+
+                        ) : (
+
+                          <div className="no-answers">
+
+                            <div>
+                              💭
+                            </div>
+
+                            <p>
+                              No answers yet.
+                              Be the first to help!
+                            </p>
+
+                          </div>
+
+                        )}
+
+                        {/* =========================
+                            Add Answer
+                        ========================= */}
+
+                        <div className="add-answer-box">
+
+                          <div className="add-answer-heading">
+
+                            <strong>
+                              Your Answer
+                            </strong>
+
+                            <span>
+                              Answer as{" "}
+                              {user?.name ||
+                                "Student"}
+                            </span>
+
+                          </div>
+
+                          <textarea
+                            rows="4"
+                            placeholder="Write a helpful answer..."
+                            value={
+                              answerContent[
+                                question._id
+                              ] || ""
+                            }
+                            onChange={(e) =>
+                              handleAnswerChange(
+                                question._id,
+                                e.target.value
+                              )
+                            }
+                          />
+
+                          <div className="answer-submit-row">
+
+                            <span>
+                              Be respectful and
+                              helpful.
+                            </span>
+
+                            <button
+                              type="button"
+                              className="submit-answer-btn"
+                              onClick={() =>
+                                handleAddAnswer(
+                                  question._id
+                                )
+                              }
+                              disabled={
+                                answerLoading[
+                                  question._id
+                                ]
+                              }
+                            >
+                              {answerLoading[
+                                question._id
+                              ]
+                                ? "Posting..."
+                                : "Post Answer"}
+                            </button>
+
+                          </div>
+
+                        </div>
+
+                      </div>
+
+                    )}
+
+                  </div>
+
                 </div>
 
               );
@@ -702,7 +1253,7 @@ function Questions({ setCurrentPage }) {
       )}
 
       {/* =========================
-          Add / Edit Question Modal
+          Ask/Edit Question Modal
       ========================= */}
 
       {showForm && (

@@ -1,11 +1,10 @@
 const express = require("express");
 
 const {
-  getResources,
-  createResource,
-  updateResource,
-  deleteResource,
-} = require("../controllers/resourceController");
+  getGroupResources,
+  createGroupResource,
+  deleteGroupResource,
+} = require("../controllers/groupResourceController");
 
 const protect = require("../middleware/authMiddleware");
 const upload = require("../middleware/uploadMiddleware");
@@ -13,28 +12,22 @@ const upload = require("../middleware/uploadMiddleware");
 const router = express.Router();
 
 router.get(
-  "/",
+  "/group/:groupId",
   protect,
-  getResources
+  getGroupResources
 );
 
 router.post(
-  "/",
+  "/group/:groupId",
   protect,
   upload.single("file"),
-  createResource
-);
-
-router.put(
-  "/:id",
-  protect,
-  updateResource
+  createGroupResource
 );
 
 router.delete(
   "/:id",
   protect,
-  deleteResource
+  deleteGroupResource
 );
 
 module.exports = router;

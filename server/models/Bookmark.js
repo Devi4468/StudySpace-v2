@@ -25,23 +25,35 @@ const bookmarkSchema = new mongoose.Schema(
   }
 );
 
-// Prevent the same user from bookmarking
-// the same resource more than once.
+// ======================================================
+// Resource Bookmark Index
+// ======================================================
+// A user can bookmark the same resource only once.
+// Documents where "resource" is not an ObjectId
+// (for example question bookmarks) are ignored.
 bookmarkSchema.index(
   { user: 1, resource: 1 },
   {
     unique: true,
-    sparse: true,
+    partialFilterExpression: {
+      resource: { $type: "objectId" },
+    },
   }
 );
 
-// Prevent the same user from bookmarking
-// the same question more than once.
+// ======================================================
+// Question Bookmark Index
+// ======================================================
+// A user can bookmark the same question only once.
+// Documents where "question" is not an ObjectId
+// (for example resource bookmarks) are ignored.
 bookmarkSchema.index(
   { user: 1, question: 1 },
   {
     unique: true,
-    sparse: true,
+    partialFilterExpression: {
+      question: { $type: "objectId" },
+    },
   }
 );
 
