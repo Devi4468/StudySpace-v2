@@ -19,6 +19,7 @@ dotenv.config();
 const app = express();
 
 const PORT = process.env.PORT || 5000;
+
 connectDB();
 
 // ======================================================
@@ -29,6 +30,7 @@ app.use(
   cors({
     origin: [
       "http://localhost:5173",
+      "https://study-space-v2-one.vercel.app",
     ],
     methods: [
       "GET",
