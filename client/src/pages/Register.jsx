@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "../context/AuthContext";
+import apiRequest from "../services/api";
 
 function Register({ setCurrentPage }) {
   const { login } = useAuth();
@@ -57,13 +58,10 @@ function Register({ setCurrentPage }) {
     setLoading(true);
 
     try {
-      const response = await fetch(
-        "http://localhost:5000/api/users/register",
+      const data = await apiRequest(
+        "/users/register",
         {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
           body: JSON.stringify({
             name: formData.name,
             email: formData.email,
@@ -71,13 +69,6 @@ function Register({ setCurrentPage }) {
           }),
         }
       );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        alert(data.message || "Registration failed");
-        return;
-      }
 
       login(data.user, data.token);
 
@@ -89,7 +80,8 @@ function Register({ setCurrentPage }) {
       );
 
       alert(
-        "Could not connect to the server. Please make sure the backend is running."
+        error.message ||
+          "Could not connect to the server. Please try again."
       );
     } finally {
       setLoading(false);

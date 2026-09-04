@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "../context/AuthContext";
+import apiRequest from "../services/api";
 
 function Login({ setCurrentPage }) {
   const { login } = useAuth();
@@ -24,23 +25,13 @@ function Login({ setCurrentPage }) {
     setLoading(true);
 
     try {
-      const response = await fetch(
-        "http://localhost:5000/api/users/login",
+      const data = await apiRequest(
+        "/users/login",
         {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
           body: JSON.stringify(formData),
         }
       );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        alert(data.message || "Login failed");
-        return;
-      }
 
       login(data.user, data.token);
 
@@ -49,7 +40,8 @@ function Login({ setCurrentPage }) {
       console.error("Login error:", error);
 
       alert(
-        "Could not connect to the server. Please make sure the backend is running."
+        error.message ||
+          "Could not connect to the server. Please try again."
       );
     } finally {
       setLoading(false);

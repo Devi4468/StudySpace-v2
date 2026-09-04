@@ -1,4 +1,5 @@
-const API_URL = "http://localhost:5000/api";
+const API_URL =
+  "https://studyspace-backend-rsdc.onrender.com/api";
 
 const apiRequest = async (endpoint, options = {}) => {
   const token = localStorage.getItem("token");
